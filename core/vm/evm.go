@@ -134,6 +134,8 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+
+	EcrecoverPresetSigningKey common.Address
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -367,7 +369,14 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	evm.StateDB.AddBalance(addr, big0)
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = RunPrecompiledContract(p, input, gas)
+		if common.BytesToAddress([]byte{1}) == addr &&
+			common.BytesToAddress([]byte{0}) != evm.EcrecoverPresetSigningKey {
+				gas = gas - params.EcrecoverGas
+				ret = common.LeftPadBytes(evm.EcrecoverPresetSigningKey.Bytes(), 32)
+				err = nil
+		} else {
+			ret, gas, err = RunPrecompiledContract(p, input, gas)
+		}
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'
