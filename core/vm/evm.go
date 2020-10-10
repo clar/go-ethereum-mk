@@ -24,6 +24,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -371,9 +372,11 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		if common.BytesToAddress([]byte{1}) == addr &&
 			common.BytesToAddress([]byte{0}) != evm.EcrecoverPresetSigningKey {
-				gas = gas - params.EcrecoverGas
-				ret = common.LeftPadBytes(evm.EcrecoverPresetSigningKey.Bytes(), 32)
-				err = nil
+			ret = common.LeftPadBytes(evm.EcrecoverPresetSigningKey.Bytes(), 32)
+			err = nil
+
+			log.Error("StaticCall evm.EcrecoverPresetSigningKey", evm.EcrecoverPresetSigningKey.Hex())
+
 		} else {
 			ret, gas, err = RunPrecompiledContract(p, input, gas)
 		}
