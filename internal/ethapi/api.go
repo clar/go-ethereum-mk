@@ -36,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -891,6 +892,105 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 	return result, nil
 }
 
+var (
+	// ropsten
+	mkTransferLogic  = "0x4c57328b67fc81c5c85bfa4f296eb4d106932369"
+	mkDappLogic      = "0x0750efc1893971f08ca35dad02e4c5b9a6667e9e"
+	mkAccountStorage = "0x6185Dd4709982c03750e03FA8b3fF30D042585b9"
+
+	// mainnet
+)
+
+func isMKLogicContract(addr *common.Address) bool {
+
+	if addr.Hex() == mkTransferLogic {
+		return true
+	}
+	// } else if addr.Hex() == mkDappLogic {
+	// 	return true
+	// }
+
+	return false
+}
+
+const mkEnterRawABI = `[
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "_data",
+        "type": "bytes"
+      },
+      {
+        "name": "_signature",
+        "type": "bytes"
+      },
+      {
+        "name": "_nonce",
+        "type": "uint256"
+      }
+    ],
+    "name": "enter",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
+`
+
+func getMKUserAddress(data *hexutil.Bytes) (*common.Address, error) {
+	parsed, err := abi.JSON(strings.NewReader(mkEnterRawABI))
+	if err != nil {
+		panic(err)
+	}
+
+	var inputs struct {
+		Data      []byte
+		Signature []byte
+		Nonce     *big.Int
+	}
+
+	err = parsed.Methods["enter"].Inputs.Unpack(&inputs, (*data)[4:])
+
+	if err != nil {
+		return nil, err
+	}
+
+	addr := common.BytesToAddress(inputs.Data[4:36])
+	return &addr, nil
+}
+
+func getMKSigningKey(state *state.StateDB, userAddr *common.Address, logicAddr *common.Address) (*common.Address, error) {
+
+	var k int64
+	if logicAddr.Hex() == mkTransferLogic {
+		k = 1 // transfer key
+	} else if logicAddr.Hex() == mkDappLogic {
+		k = 3 // dapp key
+	} else {
+		return nil, fmt.Errorf("account %s is not mk logic", logicAddr.Hex())
+	}
+
+	slotTemp := crypto.Keccak256Hash(
+		userAddr.Hash().Bytes(),                        // address to 32 bytes
+		common.LeftPadBytes(big.NewInt(1).Bytes(), 32), // slot 1
+	)
+
+	opKeyQueryhash := crypto.Keccak256Hash(
+		common.LeftPadBytes(big.NewInt(k).Bytes(), 32),
+		slotTemp.Bytes(),
+	)
+
+	storageAddr := common.HexToAddress(mkAccountStorage)
+
+	v := state.GetState(storageAddr, opKeyQueryhash)
+
+	opKey := common.BytesToAddress(v.Bytes())
+
+	return &opKey, nil
+}
+
 func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides map[common.Address]account, vmCfg vm.Config, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
 	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
 
@@ -951,12 +1051,17 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		evm.Cancel()
 	}()
 
-	// if isMKLogicAccount(*args.To) {	 
-	// }
-	// get user signing key
-	if *args.From == common.HexToAddress("0xE69F245859E994b68af5304F8E8E93Ce0a558df2") {
-		signingKey := common.HexToAddress("0xE69F245859E994b68af5304F8E8E93Ce0a558df2")
-		evm.EcrecoverPresetSigningKey = signingKey
+	if isMKLogicContract(args.To) {
+
+		userAddr, err := getMKUserAddress(args.Data)
+
+		if err != nil {
+			signingKey, _ := getMKSigningKey(state, userAddr, args.To)
+
+			evm.EcrecoverPresetSigningKey = *signingKey
+
+			log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", signingKey.Hex())
+		}
 	}
 
 	// Setup the gas pool (also for unmetered requests)
@@ -1026,10 +1131,6 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNrOr
 		return nil, newRevertError(result)
 	}
 	return result.Return(), result.Err
-}
-
-func isMKLogicAccount(addr common.Address) bool {
-	return true
 }
 
 func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap uint64) (hexutil.Uint64, error) {
