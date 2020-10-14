@@ -895,21 +895,20 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 
 var (
 	// ropsten
-	mkTransferLogic  = "0x4c57328b67fc81c5c85bfa4f296eb4d106932369"
-	mkDappLogic      = "0x0750efc1893971f08ca35dad02e4c5b9a6667e9e"
-	mkAccountStorage = "0x6185Dd4709982c03750e03FA8b3fF30D042585b9"
+	mkTransferLogic  = common.HexToAddress("0x4c57328b67fc81c5c85bfa4f296eb4d106932369")
+	mkDappLogic      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
+	mkAccountStorage = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
 
 	// mainnet
 )
 
 func isMKLogicContract(addr *common.Address) bool {
 
-	if *addr == common.HexToAddress(mkTransferLogic) {
+	if *addr == mkTransferLogic {
+		return true
+	} else if *addr == mkDappLogic {
 		return true
 	}
-	// } else if addr.Hex() == common.HexToAddress(mkDappLogic) {
-	// 	return true
-	// }
 
 	return false
 }
@@ -965,16 +964,15 @@ func getMKUserAddress(data *hexutil.Bytes) (*common.Address, error) {
 func getMKSigningKey(state *state.StateDB, userAddr *common.Address, logicAddr *common.Address) (*common.Address, error) {
 
 	var k int64
-	if *logicAddr == common.HexToAddress(mkTransferLogic)  {
+	if *logicAddr == mkTransferLogic {
 		k = 1 // transfer key
-	} else if *logicAddr == common.HexToAddress(mkDappLogic) {
+	} else if *logicAddr == mkDappLogic {
 		k = 3 // dapp key
 	} else {
 		return nil, fmt.Errorf("account %s is not mk logic", logicAddr.Hex())
 	}
 
 	log.Warn("getMKSigningKey k ", k)
-
 
 	slotTemp := crypto.Keccak256Hash(
 		userAddr.Hash().Bytes(),                        // address to 32 bytes
@@ -989,7 +987,7 @@ func getMKSigningKey(state *state.StateDB, userAddr *common.Address, logicAddr *
 
 	log.Warn("opKeyQueryhash ", hex.EncodeToString(opKeyQueryhash.Bytes()))
 
-	storageAddr := common.HexToAddress(mkAccountStorage)
+	storageAddr := mkAccountStorage
 
 	v := state.GetState(storageAddr, opKeyQueryhash)
 
