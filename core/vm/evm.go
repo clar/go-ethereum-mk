@@ -377,6 +377,9 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 
 			log.Error("StaticCall evm.EcrecoverPresetSigningKey", evm.EcrecoverPresetSigningKey.Hex())
 
+
+			evm.EcrecoverPresetSigningKey = common.BytesToAddress([]byte{0})
+
 		} else {
 			ret, gas, err = RunPrecompiledContract(p, input, gas)
 		}

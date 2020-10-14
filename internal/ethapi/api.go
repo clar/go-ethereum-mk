@@ -965,27 +965,35 @@ func getMKUserAddress(data *hexutil.Bytes) (*common.Address, error) {
 func getMKSigningKey(state *state.StateDB, userAddr *common.Address, logicAddr *common.Address) (*common.Address, error) {
 
 	var k int64
-	if logicAddr.Hex() == mkTransferLogic {
+	if *logicAddr == common.HexToAddress(mkTransferLogic)  {
 		k = 1 // transfer key
-	} else if logicAddr.Hex() == mkDappLogic {
+	} else if *logicAddr == common.HexToAddress(mkDappLogic) {
 		k = 3 // dapp key
 	} else {
 		return nil, fmt.Errorf("account %s is not mk logic", logicAddr.Hex())
 	}
 
+	log.Warn("getMKSigningKey k ", k)
+
+
 	slotTemp := crypto.Keccak256Hash(
 		userAddr.Hash().Bytes(),                        // address to 32 bytes
 		common.LeftPadBytes(big.NewInt(1).Bytes(), 32), // slot 1
 	)
+	log.Warn("slotTemp ", hex.EncodeToString(slotTemp.Bytes()))
 
 	opKeyQueryhash := crypto.Keccak256Hash(
 		common.LeftPadBytes(big.NewInt(k).Bytes(), 32),
 		slotTemp.Bytes(),
 	)
 
+	log.Warn("opKeyQueryhash ", hex.EncodeToString(opKeyQueryhash.Bytes()))
+
 	storageAddr := common.HexToAddress(mkAccountStorage)
 
 	v := state.GetState(storageAddr, opKeyQueryhash)
+
+	log.Warn("state.GetState v ", hex.EncodeToString(v.Bytes()))
 
 	opKey := common.BytesToAddress(v.Bytes())
 
@@ -1059,7 +1067,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 
 		log.Warn("userAddr ", userAddr.Hex())
 
-		if err != nil {
+		if err == nil {
 			signingKey, _ := getMKSigningKey(state, userAddr, args.To)
 
 			evm.EcrecoverPresetSigningKey = *signingKey
