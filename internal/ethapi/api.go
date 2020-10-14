@@ -19,6 +19,7 @@ package ethapi
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -903,10 +904,10 @@ var (
 
 func isMKLogicContract(addr *common.Address) bool {
 
-	if addr.Hex() == mkTransferLogic {
+	if *addr == common.HexToAddress(mkTransferLogic) {
 		return true
 	}
-	// } else if addr.Hex() == mkDappLogic {
+	// } else if addr.Hex() == common.HexToAddress(mkDappLogic) {
 	// 	return true
 	// }
 
@@ -1053,7 +1054,10 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 
 	if isMKLogicContract(args.To) {
 
+		log.Warn("args.Data ", hex.EncodeToString(*args.Data))
 		userAddr, err := getMKUserAddress(args.Data)
+
+		log.Warn("userAddr ", userAddr.Hex())
 
 		if err != nil {
 			signingKey, _ := getMKSigningKey(state, userAddr, args.To)
