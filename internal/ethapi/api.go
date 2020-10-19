@@ -895,6 +895,8 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 
 var (
 	// ropsten
+	mkAccountLogic   = common.HexToAddress("0x2F1396Dfc9b799AdEE4277077aE0d99a9Aa091da")
+	mkDualsigsLogic  = common.HexToAddress("0x4E5ACA81a1276805c09E724EB550a1DA06Fc840E")
 	mkTransferLogic  = common.HexToAddress("0x4c57328b67fc81c5c85bfa4f296eb4d106932369")
 	mkDappLogic      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
 	mkAccountStorage = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
@@ -939,7 +941,7 @@ const mkEnterRawABI = `[
 ]
 `
 
-func getMKUserAddress(data *hexutil.Bytes) (*common.Address, error) {
+func getMKUserAddressAndAction(data *hexutil.Bytes) (addr common.Address, addr2 common.Address, actionId []byte, err error) {
 	parsed, err := abi.JSON(strings.NewReader(mkEnterRawABI))
 	if err != nil {
 		panic(err)
@@ -954,25 +956,17 @@ func getMKUserAddress(data *hexutil.Bytes) (*common.Address, error) {
 	err = parsed.Methods["enter"].Inputs.Unpack(&inputs, (*data)[4:])
 
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	addr := common.BytesToAddress(inputs.Data[4:36])
-	return &addr, nil
+	addr = common.BytesToAddress(inputs.Data[4:36])
+	addr2 = common.BytesToAddress(inputs.Data[36 : 36+32])
+	// copy(actionId[:], inputs.Data[0:4])
+	actionId = inputs.Data[0:4]
+	return
 }
 
-func getMKSigningKey(state *state.StateDB, userAddr *common.Address, logicAddr *common.Address) (*common.Address, error) {
-
-	var k int64
-	if *logicAddr == mkTransferLogic {
-		k = 1 // transfer key
-	} else if *logicAddr == mkDappLogic {
-		k = 3 // dapp key
-	} else {
-		return nil, fmt.Errorf("account %s is not mk logic", logicAddr.Hex())
-	}
-
-	log.Warn("getMKSigningKey k ", k)
+func getMKSigningKey(state *state.StateDB, userAddr *common.Address, keyIndex int64) (opKey common.Address, err error) {
 
 	slotTemp := crypto.Keccak256Hash(
 		userAddr.Hash().Bytes(),                        // address to 32 bytes
@@ -981,7 +975,7 @@ func getMKSigningKey(state *state.StateDB, userAddr *common.Address, logicAddr *
 	log.Warn("slotTemp ", hex.EncodeToString(slotTemp.Bytes()))
 
 	opKeyQueryhash := crypto.Keccak256Hash(
-		common.LeftPadBytes(big.NewInt(k).Bytes(), 32),
+		common.LeftPadBytes(big.NewInt(keyIndex).Bytes(), 32),
 		slotTemp.Bytes(),
 	)
 
@@ -993,9 +987,9 @@ func getMKSigningKey(state *state.StateDB, userAddr *common.Address, logicAddr *
 
 	log.Warn("state.GetState v ", hex.EncodeToString(v.Bytes()))
 
-	opKey := common.BytesToAddress(v.Bytes())
+	opKey = common.BytesToAddress(v.Bytes())
 
-	return &opKey, nil
+	return
 }
 
 func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides map[common.Address]account, vmCfg vm.Config, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
@@ -1058,19 +1052,58 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		evm.Cancel()
 	}()
 
+	var k int64
 	if isMKLogicContract(args.To) {
 
 		log.Warn("args.Data ", hex.EncodeToString(*args.Data))
-		userAddr, err := getMKUserAddress(args.Data)
+		userAddr, _, _, err := getMKUserAddressAndAction(args.Data)
 
 		log.Warn("userAddr ", userAddr.Hex())
 
 		if err == nil {
-			signingKey, _ := getMKSigningKey(state, userAddr, args.To)
+			if *args.To == mkTransferLogic {
+				k = 1 // transfer key
+			} else {
+				k = 3 // dapp key
+			}
 
-			evm.EcrecoverPresetSigningKey = *signingKey
+			evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
 
-			log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", signingKey.Hex())
+			log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
+		}
+	} else if *args.To == mkAccountLogic {
+
+		log.Warn("args.Data ", hex.EncodeToString(*args.Data))
+		userAddr, _, methodId, err := getMKUserAddressAndAction(args.Data)
+
+		log.Warn("userAddr ", userAddr.Hex())
+
+		if err == nil {
+			if bytes.Equal(methodId, crypto.Keccak256([]byte("addOperationKey(address,address)"))[:4]) {
+				k = 2 // adding key
+			} else if bytes.Equal(methodId, crypto.Keccak256([]byte("proposeAsBackup(address,address,bytes)"))[:4]) ||
+				bytes.Equal(methodId, crypto.Keccak256([]byte("approveProposal(address,address,address,bytes)"))[:4]) {
+				k = 4 // assist key
+			} else {
+				k = 0 // admin key
+			}
+
+			evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
+
+			log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
+		}
+	} else if *args.To == mkDualsigsLogic {
+		log.Warn("args.Data ", hex.EncodeToString(*args.Data))
+		userAddr, userAddr2, _, err := getMKUserAddressAndAction(args.Data)
+
+		if err == nil {
+			k = 0 // admin key
+			evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
+			k = 4 // assist key
+			evm.EcrecoverPresetSigningKey2, _ = getMKSigningKey(state, &userAddr2, k)
+
+			log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
+			log.Warn("evm.EcrecoverPresetSigningKey2: ", userAddr2.Hex(), "sigingkey2", evm.EcrecoverPresetSigningKey2.Hex())
 		}
 	}
 

@@ -137,6 +137,9 @@ type EVM struct {
 	callGasTemp uint64
 
 	EcrecoverPresetSigningKey common.Address
+
+	// for DualsigsLogic, the second signing key
+	EcrecoverPresetSigningKey2 common.Address
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -370,19 +373,28 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	evm.StateDB.AddBalance(addr, big0)
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		if common.BytesToAddress([]byte{1}) == addr &&
-			common.BytesToAddress([]byte{0}) != evm.EcrecoverPresetSigningKey {
-			ret = common.LeftPadBytes(evm.EcrecoverPresetSigningKey.Bytes(), 32)
-			err = nil
+		if common.BytesToAddress([]byte{1}) == addr && // only skip ecrecover
+			// either EcrecoverPresetSigningKey or EcrecoverPresetSigningKey2 is not 0x0
+			(evm.EcrecoverPresetSigningKey != common.BytesToAddress([]byte{0}) || evm.EcrecoverPresetSigningKey2 != common.BytesToAddress([]byte{0})) {
 
-			log.Error("StaticCall evm.EcrecoverPresetSigningKey", evm.EcrecoverPresetSigningKey.Hex())
-
-
-			evm.EcrecoverPresetSigningKey = common.BytesToAddress([]byte{0})
+			if evm.EcrecoverPresetSigningKey != common.BytesToAddress([]byte{0}) {
+				ret = common.LeftPadBytes(evm.EcrecoverPresetSigningKey.Bytes(), 32)
+				err = nil
+				log.Error("StaticCall evm.EcrecoverPresetSigningKey", evm.EcrecoverPresetSigningKey.Hex())
+				// once skipped, set backup to 0x0
+				evm.EcrecoverPresetSigningKey = common.BytesToAddress([]byte{0})
+			} else {
+				ret = common.LeftPadBytes(evm.EcrecoverPresetSigningKey2.Bytes(), 32)
+				err = nil
+				log.Error("StaticCall evm.EcrecoverPresetSigningKey2", evm.EcrecoverPresetSigningKey2.Hex())
+				// once skipped, set backup to 0x0
+				evm.EcrecoverPresetSigningKey2 = common.BytesToAddress([]byte{0})
+			}
 
 		} else {
 			ret, gas, err = RunPrecompiledContract(p, input, gas)
 		}
+
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'
