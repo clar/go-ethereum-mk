@@ -755,12 +755,13 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 
 // CallArgs represents the arguments for a call.
 type CallArgs struct {
-	From     *common.Address `json:"from"`
-	To       *common.Address `json:"to"`
-	Gas      *hexutil.Uint64 `json:"gas"`
-	GasPrice *hexutil.Big    `json:"gasPrice"`
-	Value    *hexutil.Big    `json:"value"`
-	Data     *hexutil.Bytes  `json:"data"`
+	From          *common.Address `json:"from"`
+	To            *common.Address `json:"to"`
+	Gas           *hexutil.Uint64 `json:"gas"`
+	GasPrice      *hexutil.Big    `json:"gasPrice"`
+	Value         *hexutil.Big    `json:"value"`
+	Data          *hexutil.Bytes  `json:"data"`
+	SkipVerifySig *hexutil.Uint64 `json:"skipVerifySig"`
 }
 
 // ToMessage converts CallArgs to the Message type used by the core evm
@@ -904,17 +905,6 @@ var (
 	// mainnet
 )
 
-func isMKLogicContract(addr *common.Address) bool {
-
-	if *addr == mkTransferLogic {
-		return true
-	} else if *addr == mkDappLogic {
-		return true
-	}
-
-	return false
-}
-
 const mkEnterRawABI = `[
   {
     "constant": false,
@@ -944,7 +934,7 @@ const mkEnterRawABI = `[
 func getMKUserAddressAndAction(data *hexutil.Bytes) (addr common.Address, addr2 common.Address, actionId []byte, err error) {
 	parsed, err := abi.JSON(strings.NewReader(mkEnterRawABI))
 	if err != nil {
-		panic(err)
+		return
 	}
 
 	var inputs struct {
@@ -1052,58 +1042,66 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		evm.Cancel()
 	}()
 
-	var k int64
-	if isMKLogicContract(args.To) {
+	if uint64(*args.SkipVerifySig) > 0 {
+		var k int64
+		if *args.To == mkTransferLogic || *args.To == mkDappLogic {
 
-		log.Warn("args.Data ", hex.EncodeToString(*args.Data))
-		userAddr, _, _, err := getMKUserAddressAndAction(args.Data)
+			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
+			userAddr, _, _, err := getMKUserAddressAndAction(args.Data)
 
-		log.Warn("userAddr ", userAddr.Hex())
+			log.Warn("userAddr ", userAddr.Hex())
 
-		if err == nil {
-			if *args.To == mkTransferLogic {
-				k = 1 // transfer key
+			if err == nil {
+				if *args.To == mkTransferLogic {
+					k = 1 // transfer key
+				} else {
+					k = 3 // dapp key
+				}
+
+				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
+
+				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
 			} else {
-				k = 3 // dapp key
+				return nil, err
 			}
+		} else if *args.To == mkAccountLogic {
 
-			evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
+			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
+			userAddr, _, methodID, err := getMKUserAddressAndAction(args.Data)
 
-			log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
-		}
-	} else if *args.To == mkAccountLogic {
+			log.Warn("userAddr ", userAddr.Hex())
 
-		log.Warn("args.Data ", hex.EncodeToString(*args.Data))
-		userAddr, _, methodId, err := getMKUserAddressAndAction(args.Data)
+			if err == nil {
+				if bytes.Equal(methodID, crypto.Keccak256([]byte("addOperationKey(address,address)"))[:4]) {
+					k = 2 // adding key
+				} else if bytes.Equal(methodID, crypto.Keccak256([]byte("proposeAsBackup(address,address,bytes)"))[:4]) ||
+					bytes.Equal(methodID, crypto.Keccak256([]byte("approveProposal(address,address,address,bytes)"))[:4]) {
+					k = 4 // assist key
+				} else {
+					k = 0 // admin key
+				}
 
-		log.Warn("userAddr ", userAddr.Hex())
+				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
 
-		if err == nil {
-			if bytes.Equal(methodId, crypto.Keccak256([]byte("addOperationKey(address,address)"))[:4]) {
-				k = 2 // adding key
-			} else if bytes.Equal(methodId, crypto.Keccak256([]byte("proposeAsBackup(address,address,bytes)"))[:4]) ||
-				bytes.Equal(methodId, crypto.Keccak256([]byte("approveProposal(address,address,address,bytes)"))[:4]) {
-				k = 4 // assist key
+				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
 			} else {
+				return nil, err
+			}
+		} else if *args.To == mkDualsigsLogic {
+			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
+			userAddr, userAddr2, _, err := getMKUserAddressAndAction(args.Data)
+
+			if err == nil {
 				k = 0 // admin key
+				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
+				k = 4 // assist key
+				evm.EcrecoverPresetSigningKey2, _ = getMKSigningKey(state, &userAddr2, k)
+
+				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
+				log.Warn("evm.EcrecoverPresetSigningKey2: ", userAddr2.Hex(), "sigingkey2", evm.EcrecoverPresetSigningKey2.Hex())
+			} else {
+				return nil, err
 			}
-
-			evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
-
-			log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
-		}
-	} else if *args.To == mkDualsigsLogic {
-		log.Warn("args.Data ", hex.EncodeToString(*args.Data))
-		userAddr, userAddr2, _, err := getMKUserAddressAndAction(args.Data)
-
-		if err == nil {
-			k = 0 // admin key
-			evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
-			k = 4 // assist key
-			evm.EcrecoverPresetSigningKey2, _ = getMKSigningKey(state, &userAddr2, k)
-
-			log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
-			log.Warn("evm.EcrecoverPresetSigningKey2: ", userAddr2.Hex(), "sigingkey2", evm.EcrecoverPresetSigningKey2.Hex())
 		}
 	}
 

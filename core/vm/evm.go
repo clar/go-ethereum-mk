@@ -380,13 +380,13 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 			if evm.EcrecoverPresetSigningKey != common.BytesToAddress([]byte{0}) {
 				ret = common.LeftPadBytes(evm.EcrecoverPresetSigningKey.Bytes(), 32)
 				err = nil
-				log.Error("StaticCall evm.EcrecoverPresetSigningKey", evm.EcrecoverPresetSigningKey.Hex())
+				log.Warn("StaticCall evm.EcrecoverPresetSigningKey", evm.EcrecoverPresetSigningKey.Hex())
 				// once skipped, set backup to 0x0
 				evm.EcrecoverPresetSigningKey = common.BytesToAddress([]byte{0})
 			} else {
 				ret = common.LeftPadBytes(evm.EcrecoverPresetSigningKey2.Bytes(), 32)
 				err = nil
-				log.Error("StaticCall evm.EcrecoverPresetSigningKey2", evm.EcrecoverPresetSigningKey2.Hex())
+				log.Warn("StaticCall evm.EcrecoverPresetSigningKey2", evm.EcrecoverPresetSigningKey2.Hex())
 				// once skipped, set backup to 0x0
 				evm.EcrecoverPresetSigningKey2 = common.BytesToAddress([]byte{0})
 			}
