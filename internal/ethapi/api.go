@@ -1042,7 +1042,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		evm.Cancel()
 	}()
 
-	if uint64(*args.SkipVerifySig) > 0 {
+	if args.SkipVerifySig != nil && uint64(*args.SkipVerifySig) > 0 {
 		var k int64
 		if *args.To == mkTransferLogic || *args.To == mkDappLogic {
 
