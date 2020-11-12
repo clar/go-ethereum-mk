@@ -1047,7 +1047,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		evm.Cancel()
 	}()
 
-	var skipVerifySigUsedGas = uint64(0)
+	//var skipVerifySigUsedGas = uint64(0)
 
 	if args.SkipVerifySig != nil && uint64(*args.SkipVerifySig) > 0 {
 		var k int64
@@ -1069,7 +1069,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 
 				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
 
-				skipVerifySigUsedGas = params.EcrecoverGas
+				//skipVerifySigUsedGas = params.EcrecoverGas
 
 			} else {
 				return nil, err
@@ -1093,7 +1093,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 
 				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
 
-				skipVerifySigUsedGas = params.EcrecoverGas
+				//skipVerifySigUsedGas = params.EcrecoverGas
 
 				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
 			} else {
@@ -1109,7 +1109,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 				k = 4 // assist key
 				evm.EcrecoverPresetSigningKey2, _ = getMKSigningKey(state, &userAddr2, k)
 
-				skipVerifySigUsedGas = 2 * params.EcrecoverGas
+				//skipVerifySigUsedGas = 2 * params.EcrecoverGas
 
 				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
 				log.Warn("evm.EcrecoverPresetSigningKey2: ", userAddr2.Hex(), "sigingkey2", evm.EcrecoverPresetSigningKey2.Hex())
@@ -1134,7 +1134,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		return result, fmt.Errorf("err: %w (supplied gas %d)", err, msg.Gas())
 	}
 
-	result.UsedGas = result.UsedGas + skipVerifySigUsedGas
+	//result.UsedGas = result.UsedGas + skipVerifySigUsedGas
 	return result, nil
 }
 
@@ -1295,6 +1295,10 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 			// Otherwise, the specified gas cap is too low
 			return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
 		}
+	}
+
+	if args.SkipVerifySig != nil && uint64(*args.SkipVerifySig) > 0 {
+		hi =  hi + params.EcrecoverGas
 	}
 	return hexutil.Uint64(hi), nil
 }
