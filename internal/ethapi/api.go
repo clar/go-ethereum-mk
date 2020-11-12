@@ -895,20 +895,19 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 }
 
 var (
-	// // ropsten
+	// // // ropsten
 	// mkAccountLogic   = common.HexToAddress("0x2F1396Dfc9b799AdEE4277077aE0d99a9Aa091da")
 	// mkDualsigsLogic  = common.HexToAddress("0x4E5ACA81a1276805c09E724EB550a1DA06Fc840E")
 	// mkTransferLogic  = common.HexToAddress("0x4c57328b67fc81c5c85bfa4f296eb4d106932369")
 	// mkDappLogic      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
 	// mkAccountStorage = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
 
-	// mainnet
+	// mainnet stg
 	mkAccountLogic   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
 	mkDualsigsLogic  = common.HexToAddress("0xa8055d0befea5e6b49fa77153976879eda868266")
 	mkTransferLogic  = common.HexToAddress("0x0209873d5bb4bb285150242aeeded1bcb54cd997")
 	mkDappLogic      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
 	mkAccountStorage = common.HexToAddress("0xe791453c83F34Aee98AE38806995925502840CC0")
-	
 )
 
 const mkEnterRawABI = `[
@@ -1048,6 +1047,8 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		evm.Cancel()
 	}()
 
+	var skipVerifySigUsedGas = uint64(0)
+
 	if args.SkipVerifySig != nil && uint64(*args.SkipVerifySig) > 0 {
 		var k int64
 		if *args.To == mkTransferLogic || *args.To == mkDappLogic {
@@ -1067,6 +1068,9 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
 
 				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
+
+				skipVerifySigUsedGas = params.EcrecoverGas
+
 			} else {
 				return nil, err
 			}
@@ -1089,6 +1093,8 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 
 				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
 
+				skipVerifySigUsedGas = params.EcrecoverGas
+
 				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
 			} else {
 				return nil, err
@@ -1102,6 +1108,8 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
 				k = 4 // assist key
 				evm.EcrecoverPresetSigningKey2, _ = getMKSigningKey(state, &userAddr2, k)
+
+				skipVerifySigUsedGas = 2 * params.EcrecoverGas
 
 				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
 				log.Warn("evm.EcrecoverPresetSigningKey2: ", userAddr2.Hex(), "sigingkey2", evm.EcrecoverPresetSigningKey2.Hex())
@@ -1125,6 +1133,8 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 	if err != nil {
 		return result, fmt.Errorf("err: %w (supplied gas %d)", err, msg.Gas())
 	}
+
+	result.UsedGas = result.UsedGas + skipVerifySigUsedGas
 	return result, nil
 }
 
