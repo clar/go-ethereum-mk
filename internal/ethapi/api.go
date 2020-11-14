@@ -903,11 +903,18 @@ var (
 	// mkAccountStorage = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
 
 	// mainnet stg
-	mkAccountLogic   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
-	mkDualsigsLogic  = common.HexToAddress("0xa8055d0befea5e6b49fa77153976879eda868266")
-	mkTransferLogic  = common.HexToAddress("0x0209873d5bb4bb285150242aeeded1bcb54cd997")
-	mkDappLogic      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
-	mkAccountStorage = common.HexToAddress("0xe791453c83F34Aee98AE38806995925502840CC0")
+	// mkAccountLogic   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
+	// mkDualsigsLogic  = common.HexToAddress("0xa8055d0befea5e6b49fa77153976879eda868266")
+	// mkTransferLogic  = common.HexToAddress("0x0209873d5bb4bb285150242aeeded1bcb54cd997")
+	// mkDappLogic      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
+	// mkAccountStorage = common.HexToAddress("0xe791453c83F34Aee98AE38806995925502840CC0")
+
+	// mainnet prd
+	mkAccountLogic   = common.HexToAddress("0x205dc661Ee6946319ebb0698A017BCc20549910F")
+	mkDualsigsLogic  = common.HexToAddress("0x142914E134348E51c5f402bAeD81810A1f829e7B")
+	mkTransferLogic  = common.HexToAddress("0x1C2349ACBb7f83d07577692c75B6D7654899BF10")
+	mkDappLogic      = common.HexToAddress("0xf9bb55b6a14acd32066182f0f5f0296073f5d054")
+	mkAccountStorage = common.HexToAddress("0xADc92d1fD878580579716d944eF3460E241604b7")
 )
 
 const mkEnterRawABI = `[
