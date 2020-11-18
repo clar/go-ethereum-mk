@@ -903,18 +903,18 @@ var (
 	// mkAccountStorage = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
 
 	// mainnet stg
-	// mkAccountLogic   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
-	// mkDualsigsLogic  = common.HexToAddress("0xa8055d0befea5e6b49fa77153976879eda868266")
-	// mkTransferLogic  = common.HexToAddress("0x0209873d5bb4bb285150242aeeded1bcb54cd997")
-	// mkDappLogic      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
-	// mkAccountStorage = common.HexToAddress("0xe791453c83F34Aee98AE38806995925502840CC0")
+	mkAccountLogic_stg   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
+	mkDualsigsLogic_stg  = common.HexToAddress("0xa8055d0befea5e6b49fa77153976879eda868266")
+	mkTransferLogic_stg  = common.HexToAddress("0x0209873d5bb4bb285150242aeeded1bcb54cd997")
+	mkDappLogic_stg      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
+	mkAccountStorage_stg = common.HexToAddress("0xe791453c83F34Aee98AE38806995925502840CC0")
 
 	// mainnet prd
-	mkAccountLogic   = common.HexToAddress("0x205dc661Ee6946319ebb0698A017BCc20549910F")
-	mkDualsigsLogic  = common.HexToAddress("0x142914E134348E51c5f402bAeD81810A1f829e7B")
-	mkTransferLogic  = common.HexToAddress("0x1C2349ACBb7f83d07577692c75B6D7654899BF10")
-	mkDappLogic      = common.HexToAddress("0xf9bb55b6a14acd32066182f0f5f0296073f5d054")
-	mkAccountStorage = common.HexToAddress("0xADc92d1fD878580579716d944eF3460E241604b7")
+	mkAccountLogic_prd   = common.HexToAddress("0x205dc661Ee6946319ebb0698A017BCc20549910F")
+	mkDualsigsLogic_prd  = common.HexToAddress("0x142914E134348E51c5f402bAeD81810A1f829e7B")
+	mkTransferLogic_prd  = common.HexToAddress("0x1C2349ACBb7f83d07577692c75B6D7654899BF10")
+	mkDappLogic_prd      = common.HexToAddress("0xf9bb55b6a14acd32066182f0f5f0296073f5d054")
+	mkAccountStorage_prd = common.HexToAddress("0xADc92d1fD878580579716d944eF3460E241604b7")
 )
 
 const mkEnterRawABI = `[
@@ -943,6 +943,15 @@ const mkEnterRawABI = `[
 ]
 `
 
+func getMKAccountStorageAddr(logicAddr common.Address) (storageAddr common.Address) {
+	if logicAddr == mkTransferLogic_prd || logicAddr == mkDappLogic_prd || logicAddr == mkAccountLogic_prd || logicAddr == mkDualsigsLogic_prd {
+		storageAddr = mkAccountStorage_prd
+	} else {
+		storageAddr = mkAccountStorage_stg
+	}
+	return
+}
+
 func getMKUserAddressAndAction(data *hexutil.Bytes) (addr common.Address, addr2 common.Address, actionId []byte, err error) {
 	parsed, err := abi.JSON(strings.NewReader(mkEnterRawABI))
 	if err != nil {
@@ -968,7 +977,7 @@ func getMKUserAddressAndAction(data *hexutil.Bytes) (addr common.Address, addr2 
 	return
 }
 
-func getMKSigningKey(state *state.StateDB, userAddr *common.Address, keyIndex int64) (opKey common.Address, err error) {
+func getMKSigningKey(state *state.StateDB, logicAddr *common.Address, userAddr *common.Address, keyIndex int64) (opKey common.Address, err error) {
 
 	slotTemp := crypto.Keccak256Hash(
 		userAddr.Hash().Bytes(),                        // address to 32 bytes
@@ -983,7 +992,7 @@ func getMKSigningKey(state *state.StateDB, userAddr *common.Address, keyIndex in
 
 	log.Warn("opKeyQueryhash ", hex.EncodeToString(opKeyQueryhash.Bytes()))
 
-	storageAddr := mkAccountStorage
+	storageAddr := getMKAccountStorageAddr(*logicAddr)
 
 	v := state.GetState(storageAddr, opKeyQueryhash)
 
@@ -1058,7 +1067,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 
 	if args.SkipVerifySig != nil && uint64(*args.SkipVerifySig) > 0 {
 		var k int64
-		if *args.To == mkTransferLogic || *args.To == mkDappLogic {
+		if *args.To == mkTransferLogic_prd || *args.To == mkDappLogic_prd || *args.To == mkTransferLogic_stg || *args.To == mkDappLogic_stg {
 
 			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
 			userAddr, _, _, err := getMKUserAddressAndAction(args.Data)
@@ -1066,13 +1075,13 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 			log.Warn("userAddr ", userAddr.Hex())
 
 			if err == nil {
-				if *args.To == mkTransferLogic {
+				if *args.To == mkTransferLogic_prd || *args.To == mkTransferLogic_stg {
 					k = 1 // transfer key
 				} else {
 					k = 3 // dapp key
 				}
 
-				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
+				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, args.To, &userAddr, k)
 
 				log.Warn("evm.EcrecoverPresetSigningKey: ", userAddr.Hex(), "sigingkey", evm.EcrecoverPresetSigningKey.Hex())
 
@@ -1081,7 +1090,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 			} else {
 				return nil, err
 			}
-		} else if *args.To == mkAccountLogic {
+		} else if *args.To == mkAccountLogic_prd || *args.To == mkAccountLogic_stg {
 
 			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
 			userAddr, _, methodID, err := getMKUserAddressAndAction(args.Data)
@@ -1098,7 +1107,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 					k = 0 // admin key
 				}
 
-				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
+				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, args.To, &userAddr, k)
 
 				//skipVerifySigUsedGas = params.EcrecoverGas
 
@@ -1106,15 +1115,15 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 			} else {
 				return nil, err
 			}
-		} else if *args.To == mkDualsigsLogic {
+		} else if *args.To == mkDualsigsLogic_prd || *args.To == mkDualsigsLogic_stg {
 			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
 			userAddr, userAddr2, _, err := getMKUserAddressAndAction(args.Data)
 
 			if err == nil {
 				k = 0 // admin key
-				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, &userAddr, k)
+				evm.EcrecoverPresetSigningKey, _ = getMKSigningKey(state, args.To, &userAddr, k)
 				k = 4 // assist key
-				evm.EcrecoverPresetSigningKey2, _ = getMKSigningKey(state, &userAddr2, k)
+				evm.EcrecoverPresetSigningKey2, _ = getMKSigningKey(state, args.To, &userAddr2, k)
 
 				//skipVerifySigUsedGas = 2 * params.EcrecoverGas
 
