@@ -906,7 +906,7 @@ var (
 	mkAccountLogic_stg   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
 	mkDualsigsLogic_stg  = common.HexToAddress("0xa8055d0befea5e6b49fa77153976879eda868266")
 	mkTransferLogic_stg  = common.HexToAddress("0x0209873d5bb4bb285150242aeeded1bcb54cd997")
-	mkDappLogic_stg      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
+	mkDappLogic_stg      = common.HexToAddress("0x4166b2aa25bc9e6ba37cc6ce24b3f20f3590b5d3")
 	mkAccountStorage_stg = common.HexToAddress("0xe791453c83F34Aee98AE38806995925502840CC0")
 
 	// mainnet prd
@@ -1314,7 +1314,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 	}
 
 	if args.SkipVerifySig != nil && uint64(*args.SkipVerifySig) > 0 {
-		hi =  hi + params.EcrecoverGas
+		hi = hi + params.EcrecoverGas
 	}
 	return hexutil.Uint64(hi), nil
 }
