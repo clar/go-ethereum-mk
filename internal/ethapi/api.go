@@ -896,24 +896,37 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 
 var (
 	// // // ropsten
-	// mkAccountLogic   = common.HexToAddress("0x2F1396Dfc9b799AdEE4277077aE0d99a9Aa091da")
-	// mkDualsigsLogic  = common.HexToAddress("0x4E5ACA81a1276805c09E724EB550a1DA06Fc840E")
-	// mkTransferLogic  = common.HexToAddress("0x4c57328b67fc81c5c85bfa4f296eb4d106932369")
-	// mkDappLogic      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
-	// mkAccountStorage = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
+	// mkAccountLogic_rop   = common.HexToAddress("0x2F1396Dfc9b799AdEE4277077aE0d99a9Aa091da")
+	// mkDualsigsLogic_rop  = common.HexToAddress("0x4E5ACA81a1276805c09E724EB550a1DA06Fc840E")
+	// mkTransferLogic_rop  = common.HexToAddress("0x4c57328b67fc81c5c85bfa4f296eb4d106932369")
+	// mkDappLogic_rop      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
+	// mkLogicManager_rop   = common.HexToAddress("0x9651C050C7E43d84e20629149000C96CF3D8e258")
+	// mkAccountStorage_rop = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
 
 	// mainnet stg
-	mkAccountLogic_stg   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
-	mkDualsigsLogic_stg  = common.HexToAddress("0xa8055d0befea5e6b49fa77153976879eda868266")
-	mkTransferLogic_stg  = common.HexToAddress("0x0209873d5bb4bb285150242aeeded1bcb54cd997")
-	mkDappLogic_stg      = common.HexToAddress("0x4166b2aa25bc9e6ba37cc6ce24b3f20f3590b5d3")
+	// mkAccountLogic_stg   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
+	// mkDualsigsLogic_stg  = common.HexToAddress("0xa8055d0befea5e6b49fa77153976879eda868266")
+	// mkTransferLogic_stg  = common.HexToAddress("0x0209873d5bb4bb285150242aeeded1bcb54cd997")
+	// mkDappLogic_stg      = common.HexToAddress("0x4166b2aa25bc9e6ba37cc6ce24b3f20f3590b5d3")
+	mkAccountLogic_stg  = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	mkDualsigsLogic_stg = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	mkTransferLogic_stg = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	mkDappLogic_stg     = common.HexToAddress("0x0000000000000000000000000000000000000000")
+
+	mkLogicManager_stg   = common.HexToAddress("0x3c51EA0d1d0aEd9a4da689f8092C20E51e30a01b")
 	mkAccountStorage_stg = common.HexToAddress("0xe791453c83F34Aee98AE38806995925502840CC0")
 
 	// mainnet prd
-	mkAccountLogic_prd   = common.HexToAddress("0x205dc661Ee6946319ebb0698A017BCc20549910F")
-	mkDualsigsLogic_prd  = common.HexToAddress("0x142914E134348E51c5f402bAeD81810A1f829e7B")
-	mkTransferLogic_prd  = common.HexToAddress("0x1C2349ACBb7f83d07577692c75B6D7654899BF10")
-	mkDappLogic_prd      = common.HexToAddress("0xf9bb55b6a14acd32066182f0f5f0296073f5d054")
+	// mkAccountLogic_prd  = common.HexToAddress("0x205dc661Ee6946319ebb0698A017BCc20549910F")
+	// mkDualsigsLogic_prd = common.HexToAddress("0x142914E134348E51c5f402bAeD81810A1f829e7B")
+	// mkTransferLogic_prd = common.HexToAddress("0x1C2349ACBb7f83d07577692c75B6D7654899BF10")
+	// mkDappLogic_prd     = common.HexToAddress("0xf9bb55b6a14acd32066182f0f5f0296073f5d054")
+	mkAccountLogic_prd  = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	mkDualsigsLogic_prd = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	mkTransferLogic_prd = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	mkDappLogic_prd     = common.HexToAddress("0x0000000000000000000000000000000000000000")
+
+	mkLogicManager_prd   = common.HexToAddress("0xDF8aC96BC9198c610285b3d1B29de09621B04528")
 	mkAccountStorage_prd = common.HexToAddress("0xADc92d1fD878580579716d944eF3460E241604b7")
 )
 
@@ -1003,6 +1016,67 @@ func getMKSigningKey(state *state.StateDB, logicAddr *common.Address, userAddr *
 	return
 }
 
+func getMKLogicAddress(state *state.StateDB, mkLogicManager common.Address) (accountLogic common.Address, transferLogic common.Address, dualsigsLogic common.Address, dappLogic common.Address) {
+	//https://programtheblockchain.com/posts/2018/03/09/understanding-ethereum-smart-contract-storage/
+
+	// LogicManager is Owned
+	// slot 0 - address public owner;
+	// 		getStorageAt(LogicManagerAddr, 0)
+	//
+	// slot 1 - mapping (address => bool) public authorized;
+	//
+	// slot 2 - address[] public authorizedLogics;
+	//      slotHash =  keccak(2)
+	//      slot = slotHash + arrayIndex
+
+	slotHash := crypto.Keccak256Hash(
+		common.LeftPadBytes(big.NewInt(2).Bytes(), 32), // slot 2
+	)
+
+	// mkLogicManager := mkLogicManager_stg
+
+	fmt.Println("slotHash logicmgr ", hex.EncodeToString(slotHash.Bytes()))
+
+	/*
+	   array
+	   index 0: AccountLogic address
+	         1: TransferLogic address
+	         2: DualsigsLogic address
+	         3: DappLogic address
+	         4: ...
+	*/
+
+	accountLogicLocation := new(big.Int).Add(slotHash.Big(), big.NewInt(0))
+	accountLogicQueryhash := common.BigToHash(accountLogicLocation)
+	fmt.Println("accountLogicQueryhash ", accountLogicQueryhash.Hex())
+	v := state.GetState(mkLogicManager, accountLogicQueryhash)
+	accountLogic = common.BytesToAddress(v.Bytes())
+	log.Warn("accountLogic: ", accountLogic.Hex())
+
+	transferLogicLocation := new(big.Int).Add(slotHash.Big(), big.NewInt(1))
+	transferLogicQueryhash := common.BigToHash(transferLogicLocation)
+	fmt.Println("transferLogicQueryhash ", transferLogicQueryhash.Hex())
+	v = state.GetState(mkLogicManager, transferLogicQueryhash)
+	transferLogic = common.BytesToAddress(v.Bytes())
+	log.Warn("transferLogic: ", transferLogic.Hex())
+
+	dualsigsLogicLocation := new(big.Int).Add(slotHash.Big(), big.NewInt(2))
+	dualsigsLogicQueryhash := common.BigToHash(dualsigsLogicLocation)
+	fmt.Println("dualsigsLogicQueryhash ", dualsigsLogicQueryhash.Hex())
+	v = state.GetState(mkLogicManager, dualsigsLogicQueryhash)
+	dualsigsLogic = common.BytesToAddress(v.Bytes())
+	log.Warn("dualsigsLogic: ", dualsigsLogic.Hex())
+
+	dappLogicLocation := new(big.Int).Add(slotHash.Big(), big.NewInt(3))
+	dappLogicQueryhash := common.BigToHash(dappLogicLocation)
+	fmt.Println("dappLogicQueryhash ", dappLogicQueryhash.Hex())
+	v = state.GetState(mkLogicManager, dappLogicQueryhash)
+	dappLogic = common.BytesToAddress(v.Bytes())
+	log.Warn("dappLogic: ", dappLogic.Hex())
+
+	return
+}
+
 func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides map[common.Address]account, vmCfg vm.Config, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
 	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
 
@@ -1063,7 +1137,8 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		evm.Cancel()
 	}()
 
-	//var skipVerifySigUsedGas = uint64(0)
+	mkAccountLogic_stg, mkTransferLogic_stg, mkDualsigsLogic_stg, mkDappLogic_stg = getMKLogicAddress(state, mkLogicManager_stg)
+	mkAccountLogic_prd, mkTransferLogic_prd, mkDualsigsLogic_prd, mkDappLogic_prd = getMKLogicAddress(state, mkLogicManager_prd)
 
 	if args.SkipVerifySig != nil && uint64(*args.SkipVerifySig) > 0 {
 		var k int64

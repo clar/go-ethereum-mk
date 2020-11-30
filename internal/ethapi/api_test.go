@@ -82,6 +82,35 @@ func TestDecodeLogicEnter(t *testing.T) {
 	fmt.Println(addr.Hex())
 }
 
+func TestMkLogicManagerGetStorageAt(t *testing.T) {
+
+	//https://programtheblockchain.com/posts/2018/03/09/understanding-ethereum-smart-contract-storage/
+
+	// LogicManager is Owned
+	// slot 0 - address public owner;
+	// 		getStorageAt(LogicManagerAddr, 0)
+	//
+	// slot 1 - mapping (address => bool) public authorized;
+	//
+	// slot 2 - address[] public authorizedLogics;
+	//      slotHash =  keccak(2)
+	//      slot = slotHash + arrayIndex
+
+	slotHash2 := crypto.Keccak256Hash(
+		common.LeftPadBytes(big.NewInt(2).Bytes(), 32), // slot 2
+	)
+	fmt.Println("slotHash2 ", hex.EncodeToString(slotHash2.Bytes()))
+
+	/*
+	   array
+	   index 0: AccountLogic address
+	         1: TransferLogic address
+	         2: DualsigsLogic address
+	         3: DappLogic address
+	         4: ...
+	*/
+}
+
 func TestMkAccountStorageGetStorageAt(t *testing.T) {
 
 	// AccountStorage
