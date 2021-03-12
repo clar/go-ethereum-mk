@@ -969,22 +969,25 @@ func getMKUserAddressAndAction(data *hexutil.Bytes) (addr common.Address, addr2 
 		return
 	}
 
-	var inputs struct {
-		Data      []byte
-		Signature []byte
-		Nonce     *big.Int
-	}
+	// var inputs struct {
+	// 	Data      []byte
+	// 	Signature []byte
+	// 	Nonce     *big.Int
+	// }
 
-	err = parsed.Methods["enter"].Inputs.Unpack(&inputs, (*data)[4:])
+	receivedMap := map[string]interface{}{}
+
+	err = parsed.Methods["enter"].Inputs.UnpackIntoMap(receivedMap, (*data)[4:])
 
 	if err != nil {
 		return
 	}
-
-	addr = common.BytesToAddress(inputs.Data[4:36])
-	addr2 = common.BytesToAddress(inputs.Data[36 : 36+32])
+	
+	inputsData := receivedMap["_data"].([]byte)
+	addr = common.BytesToAddress(inputsData[4:36])
+	addr2 = common.BytesToAddress(inputsData[36 : 36+32])
 	// copy(actionId[:], inputs.Data[0:4])
-	actionId = inputs.Data[0:4]
+	actionId = inputsData[0:4]
 	return
 }
 
