@@ -894,12 +894,13 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 
 var (
 	// // // ropsten
-	// mkAccountLogic_rop   = common.HexToAddress("0x2F1396Dfc9b799AdEE4277077aE0d99a9Aa091da")
-	// mkDualsigsLogic_rop  = common.HexToAddress("0x4E5ACA81a1276805c09E724EB550a1DA06Fc840E")
-	// mkTransferLogic_rop  = common.HexToAddress("0x4c57328b67fc81c5c85bfa4f296eb4d106932369")
-	// mkDappLogic_rop      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
-	// mkLogicManager_rop   = common.HexToAddress("0x9651C050C7E43d84e20629149000C96CF3D8e258")
-	// mkAccountStorage_rop = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
+	mkAccountLogic_rop   = common.HexToAddress("0x2F1396Dfc9b799AdEE4277077aE0d99a9Aa091da")
+	mkDualsigsLogic_rop  = common.HexToAddress("0x4E5ACA81a1276805c09E724EB550a1DA06Fc840E")
+	mkTransferLogic_rop  = common.HexToAddress("0x4c57328b67fc81c5c85bfa4f296eb4d106932369")
+	mkDappLogic_rop      = common.HexToAddress("0x0750efc1893971f08ca35dad02e4c5b9a6667e9e")
+	
+	mkLogicManager_rop   = common.HexToAddress("0x9651C050C7E43d84e20629149000C96CF3D8e258")
+	mkAccountStorage_rop = common.HexToAddress("0x6185Dd4709982c03750e03FA8b3fF30D042585b9")
 
 	// mainnet stg
 	// mkAccountLogic_stg   = common.HexToAddress("0xa7405b0a39b100def67460c2227a6fd3923fc021")
@@ -957,8 +958,10 @@ const mkEnterRawABI = `[
 func getMKAccountStorageAddr(logicAddr common.Address) (storageAddr common.Address) {
 	if logicAddr == mkTransferLogic_prd || logicAddr == mkDappLogic_prd || logicAddr == mkAccountLogic_prd || logicAddr == mkDualsigsLogic_prd {
 		storageAddr = mkAccountStorage_prd
-	} else {
+	} else if logicAddr == mkTransferLogic_stg || logicAddr == mkDappLogic_stg || logicAddr == mkAccountLogic_stg || logicAddr == mkDualsigsLogic_stg {
 		storageAddr = mkAccountStorage_stg
+	} else {
+		storageAddr = mkAccountStorage_rop
 	}
 	return
 }
@@ -1138,12 +1141,13 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 		evm.Cancel()
 	}()
 
+	mkAccountLogic_rop, mkTransferLogic_rop, mkDualsigsLogic_rop, mkDappLogic_rop = getMKLogicAddress(state, mkLogicManager_rop)
 	mkAccountLogic_stg, mkTransferLogic_stg, mkDualsigsLogic_stg, mkDappLogic_stg = getMKLogicAddress(state, mkLogicManager_stg)
 	mkAccountLogic_prd, mkTransferLogic_prd, mkDualsigsLogic_prd, mkDappLogic_prd = getMKLogicAddress(state, mkLogicManager_prd)
 
 	if args.SkipVerifySig != nil && uint64(*args.SkipVerifySig) > 0 {
 		var k int64
-		if *args.To == mkTransferLogic_prd || *args.To == mkDappLogic_prd || *args.To == mkTransferLogic_stg || *args.To == mkDappLogic_stg {
+		if *args.To == mkTransferLogic_prd || *args.To == mkDappLogic_prd || *args.To == mkTransferLogic_stg || *args.To == mkDappLogic_stg || *args.To == mkTransferLogic_rop || *args.To == mkDappLogic_rop {
 
 			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
 			userAddr, _, _, err := getMKUserAddressAndAction(args.Data)
@@ -1166,7 +1170,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 			} else {
 				return nil, err
 			}
-		} else if *args.To == mkAccountLogic_prd || *args.To == mkAccountLogic_stg {
+		} else if *args.To == mkAccountLogic_prd || *args.To == mkAccountLogic_stg || *args.To == mkAccountLogic_rop {
 
 			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
 			userAddr, _, methodID, err := getMKUserAddressAndAction(args.Data)
@@ -1191,7 +1195,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 			} else {
 				return nil, err
 			}
-		} else if *args.To == mkDualsigsLogic_prd || *args.To == mkDualsigsLogic_stg {
+		} else if *args.To == mkDualsigsLogic_prd || *args.To == mkDualsigsLogic_stg || *args.To == mkDualsigsLogic_rop {
 			log.Warn("args.Data ", hex.EncodeToString(*args.Data))
 			userAddr, userAddr2, _, err := getMKUserAddressAndAction(args.Data)
 
