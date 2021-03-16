@@ -1155,7 +1155,7 @@ func DoCallEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrH
 			log.Warn("userAddr ", userAddr.Hex())
 
 			if err == nil {
-				if *args.To == mkTransferLogic_prd || *args.To == mkTransferLogic_stg {
+				if *args.To == mkTransferLogic_prd || *args.To == mkTransferLogic_stg || *args.To == mkTransferLogic_rop {
 					k = 1 // transfer key
 				} else {
 					k = 3 // dapp key
